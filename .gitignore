@@ -1,0 +1,28 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Environment variables (Sangat Penting agar file rahasia tidak terupload!)
+.env
+
+# MacOS sampah
+.DS_Store
+```eof
+
+#### Langkah 4: Push Menggunakan Terminal (Lebih Pasti!)
+Daripada menggunakan tombol GUI yang sering *nge-bug* seperti di gambarmu, *programmer* biasanya memakai Terminal. Buka terminal VS Code kamu, ketik perintah ini satu per satu lalu tekan **Enter**:
+
+1. Menambahkan semua file:
+   
+```bash
+   git add .
