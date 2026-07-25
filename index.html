@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AssetFlow | Enterprise IT Management</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .modal-active { display: flex !important; }
+        .toast-enter { transform: translateY(100%); opacity: 0; }
+        .toast-active { transform: translateY(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Loading Spinner for Buttons */
+        .btn-loading { color: transparent !important; pointer-events: none; position: relative; }
+        .btn-loading::after {
+            content: ''; position: absolute; width: 1.2rem; height: 1.2rem; top: 0; left: 0; right: 0; bottom: 0;
+            margin: auto; border: 2px solid transparent; border-top-color: white; border-radius: 50%;
+            animation: button-loading-spinner 1s ease infinite;
+        }
+        @keyframes button-loading-spinner { from { transform: rotate(0turn); } to { transform: rotate(1turn); } }
+    </style>
+</head>
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800">
+
+    <!-- ================= AUTHENTICATION VIEWS (LOGIN/REGISTER) ================= -->
+    <div id="auth-view" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        
+        <div class="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md relative z-10">
+            <div class="text-center mb-8">
+                <div class="bg-blue-600 inline-block p-3 rounded-xl mb-4 shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-network-wired text-white text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">Welcome to AssetFlow</h2>
+                <p class="text-sm text-slate-500 mt-1" id="auth-subtitle">Sign in to manage your infrastructure</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                    <input type="email" id="loginEmail" required class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input type="password" id="loginPassword" required class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-slate-50">
+                </div>
+                <button type="submit" id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition duration-200">
+                    Sign In
+                </button>
+                <p class="text-center text-sm text-slate-500 mt-4">
+                    New administrator? <a href="#" onclick="toggleAuth('register')" class="text-blue-600 font-medium hover:underline">Create an account</a>
+                </p>
+            </form>
+
+            <!-- Register Form (Hidden by default) -->
+            <form id="registerForm" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                    <input type="text" id="regName" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                    <input type="email" id="regEmail" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input type="password" id="regPassword" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition bg-slate-50">
+                </div>
+                <button type="submit" id="btnRegister" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-lg shadow-md transition mt-2">
+                    Register Account
+                </button>
+                <p class="text-center text-sm text-slate-500 mt-4">
+                    Already have an account? <a href="#" onclick="toggleAuth('login')" class="text-blue-600 font-medium hover:underline">Sign In</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MAIN DASHBOARD APPLICATION ================= -->
+    <div id="app-view" class="flex w-full h-full hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col shadow-2xl z-20">
+            <div class="p-6 flex items-center border-b border-slate-800">
+                <div class="bg-blue-600 p-2 rounded-lg mr-3 shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-network-wired text-white text-lg"></i>
+                </div>
+                <span class="text-xl font-bold tracking-wider text-white">AssetFlow</span>
+            </div>
+            
+            <!-- User Profile Info -->
+            <div class="p-4 border-b border-slate-800 flex items-center">
+                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold mr-3 border-2 border-slate-600" id="userInitials">A</div>
+                <div class="overflow-hidden">
+                    <p class="text-sm font-semibold text-white truncate" id="userNameDisplay">Admin</p>
+                    <p class="text-xs text-slate-400">System Administrator</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-1">
+                <p class="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 mt-2">Main Menu</p>
+                <button onclick="switchMenu('infrastructure')" id="menu-infrastructure" class="w-full flex items-center px-4 py-2.5 bg-blue-600/10 text-blue-500 rounded-lg font-medium transition duration-200">
+                    <i class="fa-solid fa-server w-5 mr-3"></i> Infrastructure
+                </button>
+                <button onclick="switchMenu('security')" id="menu-security" class="w-full flex items-center px-4 py-2.5 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition duration-200">
+                    <i class="fa-solid fa-shield-halved w-5 mr-3"></i> Security Logs
+                </button>
+                <button onclick="switchMenu('users')" id="menu-users" class="w-full flex items-center px-4 py-2.5 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition duration-200">
+                    <i class="fa-solid fa-users-cog w-5 mr-3"></i> User Access
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800">
+                <button onclick="logout()" class="w-full flex items-center px-4 py-2 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition">
+                    <i class="fa-solid fa-arrow-right-from-bracket w-5 mr-3"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col overflow-hidden relative bg-slate-50">
+            
+            <!-- HEADER -->
+            <header class="bg-white shadow-sm px-8 py-5 flex justify-between items-center z-10 border-b border-slate-200">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800" id="pageTitle">IT Infrastructure Assets</h1>
+                    <p class="text-sm text-slate-500 mt-1" id="pageSubtitle">Manage and monitor network devices and hardware.</p>
+                </div>
+                
+                <!-- Dynamic Header Actions (Only show search & add in infrastructure view) -->
+                <div class="flex space-x-4" id="headerActions">
+                    <div class="relative group">
+                        <i class="fa-solid fa-search absolute left-3 top-3 text-slate-400 group-focus-within:text-blue-500 transition"></i>
+                        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search assets..." class="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none w-64 transition">
+                    </div>
+                    <button onclick="openModal('add')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md shadow-blue-500/20 transition flex items-center">
+                        <i class="fa-solid fa-plus mr-2"></i> Register Asset
+                    </button>
+                </div>
+            </header>
+
+            <!-- WORKSPACE AREA -->
+            <div class="flex-1 overflow-y-auto p-8 relative">
+                
+                <!-- VIEW 1: INFRASTRUCTURE (Assets CRUD) -->
+                <div id="view-infrastructure" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100 flex items-center justify-between">
+                            <div><p class="text-sm text-slate-500 font-medium mb-1">Total Assets</p><p class="text-3xl font-bold text-slate-800" id="stat-total">0</p></div>
+                            <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><i class="fa-solid fa-microchip text-xl"></i></div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100 flex items-center justify-between">
+                            <div><p class="text-sm text-slate-500 font-medium mb-1">Active</p><p class="text-3xl font-bold text-emerald-600" id="stat-active">0</p></div>
+                            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><i class="fa-solid fa-check text-xl"></i></div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100 flex items-center justify-between">
+                            <div><p class="text-sm text-slate-500 font-medium mb-1">Maintenance</p><p class="text-3xl font-bold text-amber-500" id="stat-maintenance">0</p></div>
+                            <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-500"><i class="fa-solid fa-wrench text-xl"></i></div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100 flex items-center justify-between">
+                            <div><p class="text-sm text-slate-500 font-medium mb-1">Offline</p><p class="text-3xl font-bold text-red-500" id="stat-offline">0</p></div>
+                            <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500"><i class="fa-solid fa-power-off text-xl"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                    <th class="px-6 py-4 w-24">Asset ID</th>
+                                    <th class="px-6 py-4">Device Info</th>
+                                    <th class="px-6 py-4">IP Address</th>
+                                    <th class="px-6 py-4">Status</th>
+                                    <th class="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="asset-table-body" class="divide-y divide-slate-100">
+                                <!-- Data Injected Here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: SECURITY LOGS (Read Only) -->
+                <div id="view-security" class="hidden space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                    <th class="px-6 py-4 w-48">Timestamp</th>
+                                    <th class="px-6 py-4">User</th>
+                                    <th class="px-6 py-4">Action Event</th>
+                                    <th class="px-6 py-4">IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body" class="divide-y divide-slate-100">
+                                <tr><td colspan="4" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading logs...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: USER ACCESS (Read Only) -->
+                <div id="view-users" class="hidden space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                    <th class="px-6 py-4 w-24">ID</th>
+                                    <th class="px-6 py-4">Name</th>
+                                    <th class="px-6 py-4">Email</th>
+                                    <th class="px-6 py-4">Role</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body" class="divide-y divide-slate-100">
+                                <tr><td colspan="4" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading users...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ================= MODALS & TOASTS ================= -->
+    
+    <!-- CRUD Modal -->
+    <div id="assetModal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300" id="modalContent">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-lg font-bold text-slate-800" id="modalTitle">Register New Asset</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 transition bg-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="assetForm" class="p-6 space-y-5">
+                <input type="hidden" id="assetId">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Device Name</label>
+                    <input type="text" id="name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition" placeholder="e.g. Core-Router-01">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
+                    <select id="category" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none">
+                        <option value="Router">Router / Switch</option>
+                        <option value="Server">Server</option>
+                        <option value="Workstation">Workstation</option>
+                        <option value="IoT Device">IoT Sensor / Device</option>
+                        <option value="Firewall">Firewall / Security</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">IP Address <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <input type="text" id="ip_address" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-mono text-sm" placeholder="192.168.x.x">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Status</label>
+                    <select id="status" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none">
+                        <option value="Active">Active</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Offline">Offline</option>
+                    </select>
+                </div>
+                <div class="pt-2 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition">Cancel</button>
+                    <button type="submit" id="btnSubmit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 flex items-center px-4 py-3 rounded-lg shadow-2xl text-white font-medium toast-enter pointer-events-none z-50 min-w-[250px]">
+        <i id="toastIcon" class="mr-3 text-xl"></i>
+        <span id="toastMessage">Notification</span>
+    </div>
+
+    <!-- ================= APPLICATION LOGIC (JS) ================= -->
+    <script>
+        const API_URL = 'http://localhost:8080/api/v1';
+        let currentMode = 'add';
+        let currentView = 'infrastructure';
+
+        // --- 1. INITIALIZATION & AUTH CHECK ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                showApp();
+            } else {
+                showAuth();
+            }
+        });
+
+        // --- 2. AUTHENTICATION LOGIC ---
+        function toggleAuth(type) {
+            if(type === 'register') {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+                document.getElementById('auth-subtitle').innerText = "Create a new administrator account";
+            } else {
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('loginForm').classList.remove('hidden');
+                document.getElementById('auth-subtitle').innerText = "Sign in to manage your infrastructure";
+            }
+        }
+
+        function showApp() {
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            
+            // Set User Data in Sidebar
+            const userName = localStorage.getItem('userName') || 'Admin';
+            document.getElementById('userNameDisplay').innerText = userName;
+            document.getElementById('userInitials').innerText = userName.charAt(0).toUpperCase();
+            
+            // Load Initial Data
+            switchMenu('infrastructure');
+        }
+
+        function showAuth() {
+            document.getElementById('app-view').classList.add('hidden');
+            document.getElementById('auth-view').classList.remove('hidden');
+            document.getElementById('auth-view').classList.remove('opacity-0');
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userName');
+            showAuth();
+        }
+
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Handle Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnLogin');
+            btn.classList.add('btn-loading');
+
+            const payload = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                
+                if(res.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('userName', data.name);
+                    showApp();
+                    showToast('Successfully logged in!', 'success');
+                } else {
+                    showToast(data.error || 'Login failed', 'error');
+                }
+            } catch (err) {
+                showToast('Cannot connect to server.', 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        // Handle Register
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnRegister');
+            btn.classList.add('btn-loading');
+
+            const payload = {
+                name: document.getElementById('regName').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                
+                if(res.ok) {
+                    showToast('Account created! Please log in.', 'success');
+                    toggleAuth('login');
+                } else {
+                    showToast(data.error || 'Registration failed', 'error');
+                }
+            } catch (err) {
+                showToast('Cannot connect to server.', 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        // --- 3. SPA (SINGLE PAGE APP) NAVIGATION LOGIC ---
+        function switchMenu(view) {
+            currentView = view;
+            
+            // Reset Sidebar Styling
+            ['infrastructure', 'security', 'users'].forEach(id => {
+                const el = document.getElementById(`menu-${id}`);
+                el.className = "w-full flex items-center px-4 py-2.5 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition duration-200";
+                document.getElementById(`view-${id}`).classList.add('hidden');
+            });
+
+            // Set Active Menu Styling
+            const activeEl = document.getElementById(`menu-${view}`);
+            activeEl.className = "w-full flex items-center px-4 py-2.5 bg-blue-600/10 text-blue-500 rounded-lg font-medium transition duration-200";
+            
+            // Show Target View & Update Header
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            const headerActions = document.getElementById('headerActions');
+
+            if(view === 'infrastructure') {
+                document.getElementById('pageTitle').innerText = "IT Infrastructure Assets";
+                document.getElementById('pageSubtitle').innerText = "Manage and monitor network devices and hardware.";
+                headerActions.classList.remove('hidden'); // Show search and add button
+                fetchAssets();
+            } else if (view === 'security') {
+                document.getElementById('pageTitle').innerText = "Security Event Logs";
+                document.getElementById('pageSubtitle').innerText = "System-wide security monitoring and audit trail.";
+                headerActions.classList.add('hidden'); // Hide buttons
+                fetchLogs();
+            } else if (view === 'users') {
+                document.getElementById('pageTitle').innerText = "User Access Management";
+                document.getElementById('pageSubtitle').innerText = "Manage administrative roles and access levels.";
+                headerActions.classList.add('hidden');
+                fetchUsers();
+            }
+        }
+
+        // --- 4. DATA FETCHING (DASHBOARD VIEWS) ---
+        
+        // Fetch Assets (Infrastructure View)
+        async function fetchAssets() {
+            try {
+                const res = await fetch(`${API_URL}/assets`, { headers: getAuthHeaders() });
+                if(res.status === 401) return logout(); // Token expired
+                
+                const result = await res.json();
+                const tbody = document.getElementById('asset-table-body');
+                
+                if(!result.data || result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500"><div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-inbox text-2xl text-slate-400"></i></div>No assets found. Start by registering one.</td></tr>`;
+                    updateStats(0,0,0,0);
+                    return;
+                }
+
+                let stats = { total: result.data.length, active: 0, maintenance: 0, offline: 0 };
+                tbody.innerHTML = '';
+
+                result.data.forEach(asset => {
+                    if(asset.status === 'Active') stats.active++;
+                    else if(asset.status === 'Maintenance') stats.maintenance++;
+                    else stats.offline++;
+
+                    const safeName = asset.name.replace(/'/g, "\\'");
+                    const safeCategory = asset.category.replace(/'/g, "\\'");
+                    const safeIP = asset.ip_address ? asset.ip_address : '';
+                    
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-blue-50/50 transition duration-150 border-b border-slate-100 group">
+                            <td class="px-6 py-4 text-sm font-bold text-slate-700">AST-${asset.id.toString().padStart(4, '0')}</td>
+                            <td class="px-6 py-4">
+                                <p class="text-sm font-bold text-slate-800">${asset.name}</p>
+                                <p class="text-xs text-slate-500 font-medium">${asset.category}</p>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-600 font-mono">${asset.ip_address || '<span class="text-slate-300 italic">Unassigned</span>'}</td>
+                            <td class="px-6 py-4">${getStatusBadge(asset.status)}</td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex justify-end space-x-2">
+                                    <button onclick="openModal('edit', '${asset.id}', '${safeName}', '${safeCategory}', '${safeIP}', '${asset.status}')" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 shadow-sm transition" title="Edit">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteAsset('${asset.id}')" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition" title="Delete">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>`;
+                });
+                updateStats(stats.total, stats.active, stats.maintenance, stats.offline);
+            } catch (error) {
+                document.getElementById('asset-table-body').innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Failed to load data.</td></tr>`;
+            }
+        }
+
+        // Fetch Security Logs
+        async function fetchLogs() {
+            try {
+                const res = await fetch(`${API_URL}/logs`, { headers: getAuthHeaders() });
+                if(res.status === 401) return logout();
+                const result = await res.json();
+                
+                const tbody = document.getElementById('logs-table-body');
+                tbody.innerHTML = '';
+                
+                if(!result.data) return tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No logs found.</td></tr>`;
+
+                result.data.forEach(log => {
+                    const date = new Date(log.timestamp).toLocaleString();
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="px-6 py-4 text-xs text-slate-500 font-mono">${date}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-slate-700">${log.user_email}</td>
+                            <td class="px-6 py-4 text-sm text-slate-600">${log.action}</td>
+                            <td class="px-6 py-4 text-sm text-slate-500 font-mono">${log.ip_address}</td>
+                        </tr>`;
+                });
+            } catch(e) { console.error(e) }
+        }
+
+        // Fetch Users
+        async function fetchUsers() {
+            try {
+                const res = await fetch(`${API_URL}/users`, { headers: getAuthHeaders() });
+                if(res.status === 401) return logout();
+                const result = await res.json();
+                
+                const tbody = document.getElementById('users-table-body');
+                tbody.innerHTML = '';
+                
+                if(!result.data) return tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No users found.</td></tr>`;
+
+                result.data.forEach(user => {
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="px-6 py-4 text-sm font-bold text-slate-500">USR-${user.id}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-slate-800">${user.name}</td>
+                            <td class="px-6 py-4 text-sm text-slate-600">${user.email}</td>
+                            <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">Admin</span></td>
+                        </tr>`;
+                });
+            } catch(e) { console.error(e) }
+        }
+
+
+        // --- 5. CRUD OPERATIONS (ASSETS) ---
+        document.getElementById('assetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmit');
+            btn.classList.add('btn-loading');
+            
+            const assetData = {
+                name: document.getElementById('name').value,
+                category: document.getElementById('category').value,
+                ip_address: document.getElementById('ip_address').value,
+                status: document.getElementById('status').value
+            };
+
+            const id = document.getElementById('assetId').value;
+            const url = currentMode === 'add' ? `${API_URL}/assets` : `${API_URL}/assets/${id}`;
+            const method = currentMode === 'add' ? 'POST' : 'PUT';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(assetData)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    fetchAssets();
+                    showToast(currentMode === 'add' ? 'Asset successfully registered!' : 'Asset updated successfully!');
+                } else if(response.status === 401) {
+                    logout();
+                } else {
+                    showToast('Failed to save data.', 'error');
+                }
+            } catch (error) {
+                showToast('Server connection error.', 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        async function deleteAsset(id) {
+            if (!confirm(`Are you sure you want to permanently delete Asset ID: AST-${id.toString().padStart(4, '0')}?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}/assets/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+                if (response.ok) {
+                    fetchAssets();
+                    showToast('Asset deleted successfully.', 'success');
+                } else {
+                    showToast('Failed to delete asset.', 'error');
+                }
+            } catch (error) {
+                showToast('Server connection error.', 'error');
+            }
+        }
+
+        // --- 6. UI HELPERS ---
+        function getStatusBadge(status) {
+            if (status === 'Active') return `<span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i>Active</span>`;
+            if (status === 'Maintenance') return `<span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200"><i class="fa-solid fa-wrench text-[10px] mr-1.5"></i>Maintenance</span>`;
+            return `<span class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200"><i class="fa-solid fa-plug-circle-xmark text-[10px] mr-1.5"></i>Offline</span>`;
+        }
+
+        function updateStats(total, active, maint, offline) {
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-active').innerText = active;
+            document.getElementById('stat-maintenance').innerText = maint;
+            document.getElementById('stat-offline').innerText = offline;
+        }
+
+        function filterTable() {
+            let input = document.getElementById("searchInput").value.toLowerCase();
+            let rows = document.querySelectorAll("#asset-table-body tr");
+            rows.forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+            });
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            
+            document.getElementById('toastMessage').innerText = message;
+            toast.className = `fixed bottom-5 right-5 flex items-center px-5 py-4 rounded-xl shadow-2xl text-white font-medium z-50 toast-active`;
+            
+            if (type === 'success') {
+                toast.classList.add('bg-slate-800');
+                icon.className = 'fa-solid fa-circle-check text-emerald-400';
+            } else {
+                toast.classList.add('bg-red-600');
+                icon.className = 'fa-solid fa-triangle-exclamation text-white';
+            }
+
+            setTimeout(() => { toast.classList.remove('toast-active'); toast.classList.add('toast-enter'); }, 3000);
+        }
+
+        // Modal Management
+        function openModal(mode, id, name, category, ip, status) {
+            currentMode = mode;
+            const modal = document.getElementById('assetModal');
+            const content = document.getElementById('modalContent');
+            const form = document.getElementById('assetForm');
+            
+            if (mode === 'add') {
+                document.getElementById('modalTitle').innerText = 'Register New Asset';
+                document.getElementById('btnSubmit').innerText = 'Save Asset';
+                form.reset();
+                document.getElementById('assetId').value = '';
+            } else {
+                document.getElementById('modalTitle').innerText = 'Edit Asset';
+                document.getElementById('btnSubmit').innerText = 'Update Asset';
+                document.getElementById('assetId').value = id;
+                document.getElementById('name').value = name;
+                document.getElementById('category').value = category;
+                document.getElementById('ip_address').value = ip === 'null' ? '' : ip;
+                document.getElementById('status').value = status;
+            }
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.replace('scale-95', 'scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('assetModal');
+            const content = document.getElementById('modalContent');
+            
+            content.classList.replace('scale-100', 'scale-95');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+    </script>
+</body>
+</html>
