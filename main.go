@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -41,10 +42,10 @@ var jwtKey = []byte("assetflow_super_secret_key_2026")
 var db *sql.DB
 
 func main() {
-	// KONEKSI DATABASE LANGSUNG (ANTI RIBET)
-	// ⚠️ GANTI TULISAN "PASSWORD_BARU_KAMU_DISINI" DENGAN PASSWORD SUPABASE YANG BARU!
-	// Jangan hapus tanda kutipnya ("")
-	connStr := "postgresql://postgres:Ikhsan_877!@db.mtpypozrwnekbljzxpqw.supabase.co:5432/postgres"
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		log.Println("⚠️ Warning: DATABASE_URL tidak diset, menggunakan string koneksi default")
+	}
 
 	var err error
 	db, err = sql.Open("postgres", connStr)
@@ -53,13 +54,20 @@ func main() {
 	}
 	defer db.Close()
 
-	// Tes koneksi database (Biar ketahuan kalau passwordnya salah)
+	// Tes koneksi database
 	if err = db.Ping(); err != nil {
 		log.Fatal("🚨 Password Supabase salah atau Database mati: ", err)
 	}
 
 	r := gin.Default()
 	r.Use(CORSMiddleware())
+
+	// ==========================================
+	// TAMBAHAN: Menyajikan file index.html di root
+	// ==========================================
+	r.GET("/", func(c *gin.Context) {
+		c.File("index.html")
+	})
 
 	api := r.Group("/api/v1")
 	{
@@ -99,7 +107,6 @@ func registerUser(c *gin.Context) {
 	err = db.QueryRow(query, user.Name, user.Email, string(hashedPassword)).Scan(&user.ID)
 	
 	if err != nil {
-		// INI DETEKTOR ERRORNYA: Akan nge-print langsung ke terminal VS Code!
 		log.Println("=======================================")
 		log.Println("🚨 ERROR DATABASE SAAT REGISTER 🚨")
 		log.Println("Pesan Asli:", err.Error())
@@ -239,8 +246,8 @@ func getLogs(c *gin.Context) {
 }
 
 func getUsers(c *gin.Context) {
-	rows, err := db.Query("SELECT id, name, email, role FROM users ORDER BY id ASC")
-	if err != nil {
+	rows, ef := db.Query("SELECT id, name, email, role FROM users ORDER BY id ASC")
+	if ef != nil {
 		c.JSON(http.StatusOK, gin.H{"data": []User{}})
 		return
 	}
